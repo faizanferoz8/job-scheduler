@@ -1,0 +1,48 @@
+# Postgres and two instances of the scheduler. Both instances run workers, the lease
+# reaper and the cron loop against the same database, with no coordination between them
+# beyond what the SQL does.
+x-app: &app
+  build: .
+  depends_on:
+    postgres:
+      condition: service_healthy
+  environment:
+    JOBS_DB_URL: jdbc:postgresql://postgres:5432/jobs
+    JOBS_DB_USER: jobs
+    JOBS_DB_PASSWORD: jobs
+    # Short, so that killing a worker in the dashboard plays out in seconds. The
+    # defaults are 30s and 10s.
+    JOBS_WORKER_LEASE: 9s
+    JOBS_WORKER_HEARTBEAT: 3s
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: jobs
+      POSTGRES_USER: jobs
+      POSTGRES_PASSWORD: jobs
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobs -d jobs"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - jobs-pgdata:/var/lib/postgresql/data
+
+  app-1:
+    <<: *app
+    hostname: app-1
+    ports:
+      - "8080:8080"
+
+  app-2:
+    <<: *app
+    hostname: app-2
+    ports:
+      - "8081:8080"
+
+volumes:
+  jobs-pgdata:
