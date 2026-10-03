@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: job-scheduler
+  datasource:
+    url: ${JOBS_DB_URL:jdbc:postgresql://localhost:5432/jobs}
+    username: ${JOBS_DB_USER:jobs}
+    password: ${JOBS_DB_PASSWORD:jobs}
+  threads:
+    virtual:
+      enabled: true
+
+jobs:
+  worker:
+    # An instance can serve the API without running jobs, and the other way round.
+    enabled: ${JOBS_WORKER_ENABLED:true}
+    queue: default
+    concurrency: ${JOBS_WORKER_CONCURRENCY:4}
+    poll-interval: 500ms
+    # How long a worker may go silent before its jobs are given to someone else. A running
+    # job's lease is renewed every heartbeat, so this bounds failure detection, not job length.
+    lease: ${JOBS_WORKER_LEASE:30s}
+    heartbeat: ${JOBS_WORKER_HEARTBEAT:10s}
+    # On shutdown, how long to let running jobs finish before handing them back.
+    shutdown-grace: 20s
+  retry:
+    base-delay: 2s
+    max-delay: 5m
+  maintenance:
+    # How often each instance looks for expired leases and due schedules.
+    interval: 1s
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
